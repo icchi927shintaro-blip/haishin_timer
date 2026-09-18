@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>サッカータイマー (配信用)</title>
+    <!-- MQTT通信用のライブラリを読み込み -->
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <style>
+        body, html { 
+            margin: 0; padding: 0; width: 100%; height: 100%; 
+            display: flex; justify-content: center; align-items: center; 
+            /* 配信に乗せる背景色 */
+            background-color: #052544; 
+            overflow: hidden;
+        }
+
+        #timer-container {
+            padding: 1vw 5vw;
+            border-radius: 3vw; 
+            transition: background-color 0.3s ease;
+            background-color: transparent; 
+        }
+
+        /* アディショナルタイム時の背景色 */
+        .stoppage-time {
+            background-color: #7998ab !important; 
+        }
+
+        #timer {
+            font-family: 'Impact', sans-serif;
+            font-size: 25vw; 
+            color: #ffffff;  
+            letter-spacing: 0.05em; 
+            font-variant-numeric: tabular-nums; 
+            line-height: 1;
+        }
+    </style>
+</head>
+<body>
+    <div id="timer-container">
+        <div id="timer">00:00</div>
+    </div>
+
+    <script>
+        // ★ここを自分だけの合言葉に変更してください（操作用と合わせる）
+        const ROOM_ID = "Utashiki1918"; 
+
+        let timeElapsed = 0;
+        let period = 1;
+        let isRunning = false;
+
+        const timerElement = document.getElementById('timer');
+        const containerElement = document.getElementById('timer-container');
+
+        // 描画更新
+        function updateDisplay() {
+            const m = Math.floor(timeElapsed / 60);
+            const s = timeElapsed % 60;
+            timerElement.textContent = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+
+            if ((period === 1 && timeElapsed >= 2700) || (period === 2 && timeElapsed >= 5400)) {
+                containerElement.classList.add('stoppage-time');
+            } else {
+                containerElement.classList.remove('stoppage-time');
+            }
+        }
+
+        // 内部タイマー（通信ラグ対策で自身でも時を刻む）
+        setInterval(() => {
+            if (isRunning) {
+                timeElapsed++;
+                updateDisplay();
+            }
+        }, 1000);
+
+        // 無料の公開MQTTサーバーに接続
+        const client = mqtt.connect('wss://broker.emqx.io:8083/mqtt');
+        
+        client.on('connect', () => {
+            console.log("通信サーバーに接続しました");
+            client.subscribe(ROOM_ID);
+        });
+
+        // 操作パネルからの指示を受信
+        client.on('message', (topic, message) => {
+            const data = JSON.parse(message.toString());
+            timeElapsed = data.timeElapsed;
+            period = data.period;
+            isRunning = data.isRunning;
+            updateDisplay();
+        });
+
+        updateDisplay();
+    </script>
+</body>
+</html>

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>タイマー操作パネル</title>
+    <!-- MQTT通信用のライブラリを読み込み -->
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <style>
+        body { font-family: sans-serif; background-color: #f0f0f0; padding: 10px; text-align: center; }
+        .panel { background: #fff; padding: 20px; border-radius: 10px; max-width: 400px; margin: 0 auto; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        #preview { font-family: 'Impact', sans-serif; font-size: 5rem; color: #052544; margin-bottom: 20px; }
+        .btn-group { display: flex; gap: 10px; justify-content: center; margin-bottom: 15px; flex-wrap: wrap; }
+        button { padding: 15px 20px; font-size: 1rem; font-weight: bold; cursor: pointer; border: none; border-radius: 5px; color: white; width: 45%; }
+        .btn-start { background-color: #28a745; }
+        .btn-stop { background-color: #dc3545; }
+        .btn-reset { background-color: #6c757d; width: 100%; }
+        .btn-set45 { background-color: #007bff; width: 100%; }
+        #status { font-size: 0.8rem; color: #d9534f; margin-top: 10px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="panel">
+        <h2>リモコン</h2>
+        <div id="preview">00:00</div>
+        
+        <div class="btn-group">
+            <button class="btn-start" onclick="toggleTimer(true)">▶ スタート</button>
+            <button class="btn-stop" onclick="toggleTimer(false)">⏸ ストップ</button>
+        </div>
+        <div class="btn-group">
+            <button class="btn-reset" onclick="setTime(0, 1)">⏮ 0:00 にリセット (前半)</button>
+        </div>
+        <div class="btn-group">
+            <button class="btn-set45" onclick="setTime(2700, 2)">⏭ 45:00 にセット (後半)</button>
+        </div>
+        <div id="status">通信サーバーへ接続中...</div>
+    </div>
+
+    <script>
+        // ★配信用コードと同じ合言葉にしてください
+        const ROOM_ID = "Utashiki1918"; 
+
+        let timeElapsed = 0;
+        let period = 1; 
+        let isRunning = false;
+
+        const client = mqtt.connect('wss://broker.emqx.io:8083/mqtt');
+
+        client.on('connect', () => {
+            document.getElementById('status').textContent = "🟢 接続済み: 配信画面と連動中";
+            document.getElementById('status').style.color = "#5cb85c";
+            broadcastState(); // 接続時に一回同期
+        });
+
+        function updatePreview() {
+            const m = Math.floor(timeElapsed / 60);
+            const s = timeElapsed % 60;
+            document.getElementById('preview').textContent = 
+                `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        }
+
+        // リモコン内の時計を進める
+        setInterval(() => {
+            if (isRunning) {
+                timeElapsed++;
+                updatePreview();
+            }
+        }, 1000);
+
+        // 配信画面へ現在の状態を送信
+        function broadcastState() {
+            if (client.connected) {
+                const data = { timeElapsed, period, isRunning };
+                client.publish(ROOM_ID, JSON.stringify(data));
+            }
+        }
+
+        // 定期的に送信（配信画面が後から読み込まれたり、通信が瞬断した時のための保険）
+        setInterval(broadcastState, 2000);
+
+        function toggleTimer(state) {
+            isRunning = state;
+            broadcastState();
+        }
+
+        function setTime(seconds, selectedPeriod) {
+            timeElapsed = seconds;
+            period = selectedPeriod;
+            updatePreview();
+            broadcastState();
+        }
+
+        updatePreview();
+    </script>
+</body>
+</html>
