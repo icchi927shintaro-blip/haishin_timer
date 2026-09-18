@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>サッカータイマー＆スコア (透過版)</title>
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <style>
+        body, html { 
+            margin: 0; padding: 0; width: 1920px; height: 1080px; 
+            overflow: hidden;
+            /* OBSで読み込んだ際に背景が完全に透明になります */
+            background-color: transparent; 
+        }
+
+        /* 数字の共通設定 */
+        .dynamic-text {
+            position: absolute;
+            font-family: 'Impact', sans-serif;
+            font-variant-numeric: tabular-nums;
+            line-height: 1;
+        }
+
+        /* ▼▼▼ 各数字の座標設定（OBSの画像に合わせて top と left を微調整してください） ▼▼▼ */
+
+        /* 1. タイマーの枠と数字 */
+        #timer-wrapper {
+            position: absolute;
+            top: 25px;      /* 上からの位置 */
+            left: 20px;     /* 左からの位置 */
+            padding: 5px 10px;
+            border-radius: 8px; /* アディショナルタイム時の背景の角丸 */
+            background-color: transparent; /* 通常時は透明 */
+            transition: background-color 0.3s;
+        }
+        /* 45分・90分超過時にこのクラスが付与され、背景色が出現します */
+        .stoppage-time {
+            background-color: #7998ab !important; 
+        }
+        #timer {
+            font-size: 60px;
+            color: #ffffff; /* タイマーは白文字 */
+            letter-spacing: 0.05em;
+            position: static; /* wrapperに追従させるため */
+        }
+
+        /* 2. ホーム側（左）の得点 */
+        #score-home {
+            top: 25px;
+            left: 320px;
+            font-size: 70px;
+            color: #000000; /* 得点は黒文字 */
+        }
+
+        /* 3. アウェイ側（右）の得点 */
+        #score-away {
+            top: 25px;
+            left: 450px;
+            font-size: 70px;
+            color: #000000; /* 得点は黒文字 */
+        }
+    </style>
+</head>
+<body>
+    
+    <!-- タイマー（背景色変化のための枠で囲んでいます） -->
+    <div id="timer-wrapper">
+        <div id="timer" class="dynamic-text">00:00</div>
+    </div>
+
+    <!-- 得点 -->
+    <div id="score-home" class="dynamic-text">0</div>
+    <div id="score-away" class="dynamic-text">0</div>
+
+    <script>
+        // ★リモコン側（control.html）と同じ合言葉にしてください
+        const ROOM_ID = "my_soccer_timer_room_8899"; 
+        
+        let timeElapsed = 0;
+        let period = 1;
+        let isRunning = false;
+        let scoreHome = 0;
+        let scoreAway = 0;
+
+        const timerElement = document.getElementById('timer');
+        const timerWrapper = document.getElementById('timer-wrapper');
+        const scoreHomeElement = document.getElementById('score-home');
+        const scoreAwayElement = document.getElementById('score-away');
+
+        function updateDisplay() {
+            // 時間の描画
+            const m = Math.floor(timeElapsed / 60);
+            const s = timeElapsed % 60;
+            timerElement.textContent = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+            
+            // 得点の描画
+            scoreHomeElement.textContent = scoreHome;
+            scoreAwayElement.textContent = scoreAway;
+
+            // アディショナルタイム時の背景色追加
+            if ((period === 1 && timeElapsed >= 2700) || (period === 2 && timeElapsed >= 5400)) {
+                timerWrapper.classList.add('stoppage-time');
+            } else {
+                timerWrapper.classList.remove('stoppage-time');
+            }
+        }
+
+        // 内部タイマー
+        setInterval(() => {
+            if (isRunning) {
+                timeElapsed++;
+                updateDisplay();
+            }
+        }, 1000);
+
+        // 通信処理（HiveMQサーバー・自動再接続付き）
+        const client = mqtt.connect('wss://broker.hivemq.com:8884/mqtt', {
+            keepalive: 15,
+            reconnectPeriod: 1000,
+            connectTimeout: 5000
+        });
+        
+        client.on('connect', () => { 
+            client.subscribe(ROOM_ID); 
+        });
+
+        // リモコンからのデータ受信
+        client.on('message', (topic, message) => {
+            const data = JSON.parse(message.toString());
+            timeElapsed = data.timeElapsed;
+            period = data.period;
+            isRunning = data.isRunning;
+            scoreHome = data.scoreHome;
+            scoreAway = data.scoreAway;
+            updateDisplay();
+        });
+
+        updateDisplay();
+    </script>
+</body>
+</html>
