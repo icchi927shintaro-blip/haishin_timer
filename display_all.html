@@ -23,13 +23,14 @@
         /* ▼▼▼ 各数字の座標設定（OBSの画像に合わせて top と left を微調整してください） ▼▼▼ */
 
         /* 1. タイマーの枠と数字 */
+        /* 1. タイマーの枠と数字 */
         #timer-wrapper {
             position: absolute;
-            top: 25px;      /* 上からの位置 */
-            left: 20px;     /* 左からの位置 */
+            top: 25px;      
+            left: 20px;     
             padding: 5px 10px;
-            border-radius: 8px; /* アディショナルタイム時の背景の角丸 */
-            background-color: transparent; /* 通常時は透明 */
+            border-radius: 8px; 
+            background-color: #052544;
             transition: background-color 0.3s;
         }
         /* 45分・90分超過時にこのクラスが付与され、背景色が出現します */
@@ -46,16 +47,16 @@
         /* 2. ホーム側（左）の得点 */
         #score-home {
             top: 25px;
-            left: 360px;
-            font-size: 70px;
+            left: 380px;
+            font-size: 90px;
             color: #ffffff; /* 得点は黒文字 */
         }
 
         /* 3. アウェイ側（右）の得点 */
         #score-away {
             top: 25px;
-            left: 500px;
-            font-size: 70px;
+            left: 4300px;
+            font-size: 90px;
             color: #ffffff; /* 得点は黒文字 */
         }
     </style>
