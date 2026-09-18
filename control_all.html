@@ -58,7 +58,8 @@
     </div>
 
     <script>
-        const ROOM_ID = "my_soccer_timer_room_8899"; 
+        // ★ display.html と完全に一致させる
+        const ROOM_ID = "Utashiki1918haishin"; 
 
         let timeElapsed = 0;
         let period = 1; 
@@ -66,12 +67,29 @@
         let scoreHome = 0;
         let scoreAway = 0;
 
-        const client = mqtt.connect('wss://broker.emqx.io:8084/mqtt');
+        // ★ 新しいサーバー（HiveMQ）に変更し、自動再接続オプションを追加
+        const client = mqtt.connect('wss://broker.hivemq.com:8884/mqtt', {
+            keepalive: 15,
+            reconnectPeriod: 1000,
+            connectTimeout: 5000
+        });
+
+        const statusEl = document.getElementById('status');
 
         client.on('connect', () => {
-            document.getElementById('status').textContent = "🟢 接続済み: 配信画面と連動中";
-            document.getElementById('status').style.color = "#5cb85c";
+            statusEl.textContent = "🟢 接続済み: 配信画面と連動中";
+            statusEl.style.color = "#5cb85c";
             broadcastState(); 
+        });
+
+        client.on('reconnect', () => {
+            statusEl.textContent = "🟡 通信不安定: 自動再接続しています...";
+            statusEl.style.color = "#f0ad4e";
+        });
+
+        client.on('offline', () => {
+            statusEl.textContent = "🔴 オフライン: ネットワークを確認してください";
+            statusEl.style.color = "#d9534f";
         });
 
         function updatePreview() {
@@ -112,7 +130,7 @@
 
         function changeScore(team, delta) {
             if (team === 'home') {
-                scoreHome = Math.max(0, scoreHome + delta); // マイナスにならないよう制御
+                scoreHome = Math.max(0, scoreHome + delta); 
             } else {
                 scoreAway = Math.max(0, scoreAway + delta);
             }
