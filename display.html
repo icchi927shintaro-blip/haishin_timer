@@ -74,7 +74,7 @@
         }, 1000);
 
         // 無料の公開MQTTサーバーに接続
-        const client = mqtt.connect('wss://broker.emqx.io:8083/mqtt');
+        const client = mqtt.connect('wss://broker.emqx.io:8084/mqtt');
         
         client.on('connect', () => {
             console.log("通信サーバーに接続しました");
