@@ -45,10 +45,10 @@
         let period = 1; 
         let isRunning = false;
 
-        const client = mqtt.connect('wss://broker.emqx.io:8083/mqtt');
+        const client = mqtt.connect('wss://broker.emqx.io:8084/mqtt');
 
         client.on('connect', () => {
-            document.getElementById('status').textContent = "🟢 接続済み: 配信画面と連動中";
+            document.getElementById('status').textContent = "接続済み: 配信画面と連動中";
             document.getElementById('status').style.color = "#5cb85c";
             broadcastState(); // 接続時に一回同期
         });
