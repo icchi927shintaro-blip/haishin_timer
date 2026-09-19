@@ -2,16 +2,63 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>サッカータイマー＆スコア (OBSマスター透過版)</title>
+    <title>サッカータイマー＆スコア (透過版)</title>
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
     <style>
-        body, html { margin: 0; padding: 0; width: 1920px; height: 1080px; overflow: hidden; background-color: transparent; }
-        .dynamic-text { position: absolute; font-family: 'Impact', sans-serif; font-variant-numeric: tabular-nums; line-height: 1; }
-        #timer-wrapper { position: absolute; top: 25px; left: 20px; padding: 5px 10px; border-radius: 8px; background-color: transparent; transition: background-color 0.3s; }
-        .stoppage-time { background-color: #7998ab !important; }
-        #timer { font-size: 60px; color: #ffffff; letter-spacing: 0.05em; position: static; }
-        #score-home { top: 20px; left: 350px; font-size: 80px; color: #ffffff; }
-        #score-away { top: 25px; left: 450px; font-size: 80px; color: #ffffff; }
+        body, html { 
+            margin: 0; padding: 0; width: 1920px; height: 1080px; 
+            overflow: hidden;
+            /* OBSで読み込んだ際に背景が完全に透明になります */
+            background-color: transparent; 
+        }
+
+        /* 数字の共通設定 */
+        .dynamic-text {
+            position: absolute;
+            font-family: 'Impact', sans-serif;
+            font-variant-numeric: tabular-nums;
+            line-height: 1;
+        }
+
+        /* ▼▼▼ 各数字の座標設定（OBSの画像に合わせて top と left を微調整してください） ▼▼▼ */
+
+        /* 1. タイマーの枠と数字 */
+        /* 1. タイマーの枠と数字 */
+        #timer-wrapper {
+            position: absolute;
+            top: 25px;      
+            left: 20px;     
+            padding: 5px 10px;
+            border-radius: 8px; 
+            background-color: #052544;
+            transition: background-color 0.3s;
+        }
+        /* 45分・90分超過時にこのクラスが付与され、背景色が出現します */
+        .stoppage-time {
+            background-color: #7998ab !important; 
+        }
+        #timer {
+            font-size: 60px;
+            color: #ffffff; /* タイマーは白文字 */
+            letter-spacing: 0.05em;
+            position: static; /* wrapperに追従させるため */
+        }
+
+        /* 2. ホーム側（左）の得点 */
+        #score-home {
+            top: 20px;
+            left: 350px;
+            font-size: 80px;
+            color: #ffffff; /* 得点は白文字 */
+        }
+
+        /* 3. アウェイ側（右）の得点 */
+        #score-away {
+            top: 20px;
+            left: 450px;
+            font-size: 80px;
+            color: #ffffff; /* 得点は白文字 */
+        }
     </style>
 </head>
 <body>
