@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>サッカータイマー＆スコア (OBSマスター透過版)</title>
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <style>
+        body, html { margin: 0; padding: 0; width: 1920px; height: 1080px; overflow: hidden; background-color: transparent; }
+        .dynamic-text { position: absolute; font-family: 'Impact', sans-serif; font-variant-numeric: tabular-nums; line-height: 1; }
+        #timer-wrapper { position: absolute; top: 25px; left: 20px; padding: 5px 10px; border-radius: 8px; background-color: transparent; transition: background-color 0.3s; }
+        .stoppage-time { background-color: #7998ab !important; }
+        #timer { font-size: 60px; color: #ffffff; letter-spacing: 0.05em; position: static; }
+        #score-home { top: 20px; left: 350px; font-size: 80px; color: #ffffff; }
+        #score-away { top: 25px; left: 450px; font-size: 80px; color: #ffffff; }
+    </style>
+</head>
+<body>
+    <div id="timer-wrapper"><div id="timer" class="dynamic-text">00:00</div></div>
+    <div id="score-home" class="dynamic-text">0</div>
+    <div id="score-away" class="dynamic-text">0</div>
+
+    <script>
+        const ROOM_ID = "Utashiki1918board"; 
+        const TOPIC_CMD = ROOM_ID + "/cmd";     // リモコンからの命令受信用
+        const TOPIC_STATE = ROOM_ID + "/state"; // リモコンへの状態送信用
+        
+        // ★ ここにあるデータが「絶対に正しい情報」として扱われます
+        let timeElapsed = 0;
+        let period = 1;
+        let isRunning = false;
+        let scoreHome = 0;
+        let scoreAway = 0;
+
+        const timerElement = document.getElementById('timer');
+        const timerWrapper = document.getElementById('timer-wrapper');
+        const scoreHomeElement = document.getElementById('score-home');
+        const scoreAwayElement = document.getElementById('score-away');
+
+        const client = mqtt.connect('wss://broker.hivemq.com:8884/mqtt', { keepalive: 15, reconnectPeriod: 1000, connectTimeout: 5000 });
+        
+        client.on('connect', () => { 
+            client.subscribe(TOPIC_CMD); // 命令を待ち受ける
+            broadcastState(); // 接続時に現在の状態をリモコンへ送る
+        });
+
+        // 描画更新
+        function updateDisplay() {
+            const m = Math.floor(timeElapsed / 60);
+            const s = timeElapsed % 60;
+            timerElement.textContent = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+            scoreHomeElement.textContent = scoreHome;
+            scoreAwayElement.textContent = scoreAway;
+
+            if ((period === 1 && timeElapsed >= 2700) || (period === 2 && timeElapsed >= 5400)) {
+                timerWrapper.classList.add('stoppage-time');
+            } else {
+                timerWrapper.classList.remove('stoppage-time');
+            }
+        }
+
+        // リモコンへ現在の状態を送信する関数
+        function broadcastState() {
+            if (client.connected) {
+                client.publish(TOPIC_STATE, JSON.stringify({ timeElapsed, period, isRunning, scoreHome, scoreAway }));
+            }
+        }
+
+        // 内部タイマー（OBS側が主役となって時間を進める）
+        setInterval(() => {
+            if (isRunning) {
+                timeElapsed++;
+                updateDisplay();
+            }
+            // 2秒に1回、リモコンへ状態を同期（リモコンが後から開かれた時のため）
+            if (timeElapsed % 2 === 0) broadcastState();
+        }, 1000);
+
+        // リモコンからのコマンド（命令）を受信したときの処理
+        client.on('message', (topic, message) => {
+            if (topic === TOPIC_CMD) {
+                const cmd = JSON.parse(message.toString());
+                
+                if (cmd.action === 'start') isRunning = true;
+                if (cmd.action === 'stop') isRunning = false;
+                if (cmd.action === 'setTime') { timeElapsed = cmd.timeElapsed; period = cmd.period; }
+                if (cmd.action === 'changeScore') {
+                    if (cmd.team === 'home') scoreHome = Math.max(0, scoreHome + cmd.delta);
+                    if (cmd.team === 'away') scoreAway = Math.max(0, scoreAway + cmd.delta);
+                }
+                if (cmd.action === 'resetScore') { scoreHome = 0; scoreAway = 0; }
+                
+                updateDisplay();
+                broadcastState(); // 変更されたら即座にリモコンへ反映させる
+            }
+        });
+
+        updateDisplay();
+    </script>
+</body>
+</html>

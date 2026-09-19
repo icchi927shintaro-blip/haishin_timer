@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>タイマー＆スコア操作パネル</title>
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <style>
+        body { font-family: sans-serif; background-color: #f0f0f0; padding: 10px; text-align: center; }
+        .panel { background: #fff; padding: 20px; border-radius: 10px; max-width: 400px; margin: 0 auto; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        #preview { font-family: 'Impact', sans-serif; font-size: 4rem; color: #052544; margin-bottom: 10px; }
+        .score-preview { font-family: 'Impact', sans-serif; font-size: 3rem; display: flex; justify-content: center; gap: 40px; margin-bottom: 20px; }
+        .btn-group { display: flex; gap: 10px; justify-content: center; margin-bottom: 15px; flex-wrap: wrap; }
+        button { padding: 12px; font-size: 1rem; font-weight: bold; cursor: pointer; border: none; border-radius: 5px; color: white; }
+        .btn-start { background-color: #28a745; width: 45%; }
+        .btn-stop { background-color: #dc3545; width: 45%; }
+        .btn-time { background-color: #6c757d; width: 45%; }
+        .btn-score { background-color: #17a2b8; width: 45%; font-size: 1.5rem; }
+        .btn-reset-score { background-color: #ffc107; color: black; width: 100%; }
+        #status { font-size: 0.8rem; color: #d9534f; margin-top: 10px; font-weight: bold; }
+        .section-title { font-size: 0.9rem; color: #666; margin-bottom: 5px; text-align: left; border-bottom: 1px solid #ccc; }
+    </style>
+</head>
+<body>
+    <div class="panel">
+        <h2>リモコン</h2>
+        
+        <div id="preview">00:00</div>
+        <div class="score-preview">
+            <div><span style="font-size:1rem; color:#666;">HOME</span><br><span id="preview-home">0</span></div>
+            <div><span style="font-size:1rem; color:#666;">AWAY</span><br><span id="preview-away">0</span></div>
+        </div>
+        
+        <div class="section-title">スコア操作</div>
+        <div class="btn-group">
+            <button class="btn-score" onclick="changeScore('home', -1)">-1</button>
+            <button class="btn-score" onclick="changeScore('home', 1)">+1</button>
+        </div>
+        <div class="btn-group">
+            <button class="btn-score" style="background-color: #e83e8c;" onclick="changeScore('away', -1)">-1</button>
+            <button class="btn-score" style="background-color: #e83e8c;" onclick="changeScore('away', 1)">+1</button>
+        </div>
+        <div class="btn-group">
+            <button class="btn-reset-score" onclick="sendCommand({action: 'resetScore'})">得点を 0 - 0 にリセット</button>
+        </div>
+
+        <div class="section-title" style="margin-top: 20px;">タイマー操作</div>
+        <div class="btn-group">
+            <button class="btn-start" onclick="sendCommand({action: 'start'})">▶ スタート</button>
+            <button class="btn-stop" onclick="sendCommand({action: 'stop'})">⏸ ストップ</button>
+        </div>
+        <div class="btn-group">
+            <button class="btn-time" onclick="sendCommand({action: 'setTime', timeElapsed: 0, period: 1})">⏮ 0:00 (前半)</button>
+            <button class="btn-time" onclick="sendCommand({action: 'setTime', timeElapsed: 2700, period: 2})">⏭ 45:00 (後半)</button>
+        </div>
+
+        <div id="status">通信サーバーへ接続中...</div>
+    </div>
+
+    <script>
+        const ROOM_ID = "Utashiki1918board"; 
+        const TOPIC_CMD = ROOM_ID + "/cmd";     // 命令を送信する用
+        const TOPIC_STATE = ROOM_ID + "/state"; // 配信画面からの状態受信用
+
+        let timeElapsed = 0;
+        let isRunning = false;
+        let scoreHome = 0;
+        let scoreAway = 0;
+
+        const client = mqtt.connect('wss://broker.hivemq.com:8884/mqtt', { keepalive: 15, reconnectPeriod: 1000, connectTimeout: 5000 });
+        const statusEl = document.getElementById('status');
+
+        client.on('connect', () => {
+            statusEl.textContent = "🟢 接続済み: 配信画面と連動中";
+            statusEl.style.color = "#5cb85c";
+            client.subscribe(TOPIC_STATE); // 配信画面からの最新状態を受信する
+        });
+
+        client.on('reconnect', () => { statusEl.textContent = "🟡 通信不安定: 自動再接続しています..."; statusEl.style.color = "#f0ad4e"; });
+        client.on('offline', () => { statusEl.textContent = "🔴 オフライン: ネットワークを確認してください"; statusEl.style.color = "#d9534f"; });
+
+        function updatePreview() {
+            const m = Math.floor(timeElapsed / 60);
+            const s = timeElapsed % 60;
+            document.getElementById('preview').textContent = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+            document.getElementById('preview-home').textContent = scoreHome;
+            document.getElementById('preview-away').textContent = scoreAway;
+        }
+
+        // リモコン内のプレビューを滑らかに動かす用
+        setInterval(() => {
+            if (isRunning) {
+                timeElapsed++;
+                updatePreview();
+            }
+        }, 1000);
+
+        // 配信画面(OBS)から送られてきた「真のデータ」で自分を上書きする
+        client.on('message', (topic, message) => {
+            if (topic === TOPIC_STATE) {
+                const state = JSON.parse(message.toString());
+                timeElapsed = state.timeElapsed;
+                isRunning = state.isRunning;
+                scoreHome = state.scoreHome;
+                scoreAway = state.scoreAway;
+                updatePreview();
+            }
+        });
+
+        // 配信画面(OBS)へ命令を送信する関数
+        function sendCommand(cmdData) {
+            if (client.connected) {
+                client.publish(TOPIC_CMD, JSON.stringify(cmdData));
+            }
+        }
+
+        function changeScore(team, delta) {
+            sendCommand({ action: 'changeScore', team: team, delta: delta });
+        }
+
+        updatePreview();
+    </script>
+</body>
+</html>
