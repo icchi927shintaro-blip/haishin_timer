@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>試合操作 / Pages</title>
+
+<style>
+body {
+  font-family: sans-serif;
+  background: #f0f0f0;
+  margin: 0;
+  padding: 16px;
+  color: #182a3a;
+}
+main {
+  max-width: 480px;
+  margin: auto;
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+}
+h1 {
+  text-align: center;
+  font-size: 24px;
+}
+#timer {
+  text-align: center;
+  font: 64px Impact, sans-serif;
+}
+#score {
+  text-align: center;
+  font: 48px Impact, sans-serif;
+  margin: 12px;
+}
+.row {
+  display: flex;
+  gap: 8px;
+  margin: 10px 0;
+}
+button {
+  padding: 14px;
+  border: 0;
+  border-radius: 6px;
+  background: #126b92;
+  color: white;
+  cursor: pointer;
+}
+.row button {
+  flex: 1;
+}
+button:disabled {
+  opacity: .4;
+  cursor: default;
+}
+label {
+  display: block;
+  margin-top: 12px;
+}
+input, textarea {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 8px;
+}
+textarea {
+  height: 220px;
+  font-family: monospace;
+}
+#status, #message, #phase {
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+#message {
+  color: #9a3300;
+}
+a {
+  overflow-wrap: anywhere;
+}
+</style>
+
+<main>
+  <h1>試合操作 / Pages</h1>
+
+  <p id="status" role="status">接続準備中</p>
+  <p id="message" role="alert"></p>
+
+  <button id="enable" disabled>この画面で操作を開始</button>
+
+  <p id="phase">状態受信待ち</p>
+  <div id="timer">--:--</div>
+  <div id="score">- - -</div>
+  <p id="teams" style="text-align:center">HOME / AWAY</p>
+
+  <div class="row">
+    <button
+      data-action="score"
+      data-team="home"
+      data-delta="-1"
+      disabled
+    >HOME −1</button>
+
+    <button
+      data-action="score"
+      data-team="home"
+      data-delta="1"
+      disabled
+    >HOME ＋1</button>
+  </div>
+
+  <div class="row">
+    <button
+      data-action="score"
+      data-team="away"
+      data-delta="-1"
+      disabled
+    >AWAY −1</button>
+
+    <button
+      data-action="score"
+      data-team="away"
+      data-delta="1"
+      disabled
+    >AWAY ＋1</button>
+  </div>
+
+  <div class="row">
+    <button data-action="reset" disabled>
+      得点を0対0にリセット
+    </button>
+  </div>
+
+  <div class="row">
+    <button data-action="start" disabled>▶ スタート</button>
+    <button data-action="stop" disabled>■ ストップ</button>
+  </div>
+
+  <div class="row">
+    <button
+      data-action="time"
+      data-seconds="0"
+      data-period="1"
+      disabled
+    >0:00（前半）</button>
+
+    <button
+      data-action="time"
+      data-seconds="2700"
+      data-period="2"
+      disabled
+    >45:00（後半）</button>
+  </div>
+
+  <details>
+    <summary>試合・選手登録 / バックアップ</summary>
+
+    <label>
+      大会名
+      <input id="title" maxlength="120">
+    </label>
+
+    <label>
+      HOMEチーム名
+      <input id="homeName" maxlength="80" value="HOME">
+    </label>
+
+    <label>
+      AWAYチーム名
+      <input id="awayName" maxlength="80" value="AWAY">
+    </label>
+
+    <label>
+      選手登録JSON（home / away）
+      <textarea id="players" spellcheck="false">{"home":[],"away":[]}</textarea>
+    </label>
+
+    <p>
+      選手の例：
+      {"id":"h10","name":"山田 太郎","number":10,"starter":true}
+    </p>
+
+    <button data-action="registration" disabled>
+      登録内容を保存
+    </button>
+
+    <hr>
+
+    <button id="export">試合データをJSON保存</button>
+
+    <label>
+      JSONを読み込む
+      <input
+        id="import"
+        type="file"
+        accept=".json,application/json"
+      >
+    </label>
+
+    <p>
+      読込は得点・時計も復元します。
+      実行中の時計は経過時間も含めて復元します。
+    </p>
+  </details>
+
+  <p>
+    <a id="displayLink" target="_blank" rel="noopener">
+      OBS表示を開く
+    </a>
+  </p>
+
+  <p>
+    <a id="controlLink">同じ試合の操作URL</a>
+  </p>
+
+  <p>ルームID：<span id="room"></span></p>
+
+  <p>
+    操作画面は1つだけ使用してください。
+    別の試合には別のルームIDを使用します。
+  </p>
+</main>
+
+<script src="https://unpkg.com/mqtt@5.10.4/dist/mqtt.min.js"></script>
+<script src="./pages.js"></script>
+</html>
