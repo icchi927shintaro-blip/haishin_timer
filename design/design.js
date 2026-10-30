@@ -24,7 +24,7 @@
   const fresh = () => ({
     version: 1, updatedAt: 0, source: '', scoreHome: 0, scoreAway: 0,
     clock: { baseMs: 0, startedAt: null, running: false, period: 1 },
-    registration: { title: '', home: { name: 'HOME', color: '#187fc4', players: [] }, away: { name: 'AWAY', color: '#f5d321', players: [] } }
+    registration: { title: '', home: { name: 'HOME', shortName: 'HOME', color: '#187fc4', players: [] }, away: { name: 'AWAY', shortName: 'AWAY', color: '#f5d321', players: [] } }
   });
   let state = null, active = false, connected = false, ready = false;
   let client, releaseLock;
@@ -42,10 +42,12 @@
     if (!r || !validText(r.title, 120)) throw Error('大会名が不正です');
     for (const side of ['home', 'away']) {
       const t = r[side], ids = new Set(), numbers = new Set();
+      if (t && t.shortName !== undefined && (!validText(t.shortName, 20) || !t.shortName.trim())) throw Error('略称は1〜20文字で入力してください');
       if (t && t.color !== undefined && !/^#[0-9a-f]{6}$/i.test(t.color)) throw Error('チームカラーが不正です');
       if (!t || !validText(t.name, 80) || !t.name.trim() || !Array.isArray(t.players) || t.players.length > 100)
         throw Error('チーム情報が不正です');
       for (const p of t.players) {
+        if (p && p.position !== undefined && !['', 'FW', 'MF', 'DF', 'GK'].includes(p.position)) throw Error('ポジションが不正です');
         if (!p || !validText(p.id, 80) || !p.id.trim() || ids.has(p.id) ||
           !validText(p.name, 80) || !p.name.trim() || !Number.isInteger(p.number) ||
           p.number < 0 || p.number > 999 || numbers.has(p.number) || typeof p.starter !== 'boolean')
@@ -66,8 +68,36 @@
     $('import').disabled = !connected || !active;
   }
   function registrationForm(force = false) {
-    if (control && state) window.RosterEditor.receive(state.registration, force);
+    if (control && state) { window.RosterEditor.receive(state.registration, force); drawPlayerList(); }
   }
+
+  function drawPlayerList() {
+    const root = $('confirmed-player-list');
+    root.replaceChildren();
+    for (const side of ['home', 'away']) {
+      const team = state.registration[side];
+      const heading = document.createElement('h3');
+      heading.textContent = team.name + '（' + team.players.length + '名）';
+      root.append(heading);
+      if (!team.players.length) {
+        const text = document.createElement('p'); text.textContent = '選手は未登録です'; root.append(text); continue;
+      }
+      const wrapper = document.createElement('div'); wrapper.className = 'table-wrap';
+      const table = document.createElement('table');
+      const head = table.createTHead().insertRow();
+      for (const text of ['背番号', '選手名', 'ポジション', '先発／控え']) {
+        const cell = document.createElement('th'); cell.textContent = text; head.append(cell);
+      }
+      const body = table.createTBody();
+      for (const player of [...team.players].sort((a,b) => a.number - b.number)) {
+        const row = body.insertRow();
+        for (const value of [player.number, player.name, player.position || '未設定', player.starter ? '先発' : '控え'])
+          row.insertCell().textContent = value;
+      }
+      wrapper.append(table); root.append(wrapper);
+    }
+  }
+
   function render() {
     if (control) popupPreview();
     if (!state) return;
@@ -88,7 +118,7 @@
     for (const side of ['home', 'away']) {
       const team = state.registration[side];
       const color = team.color || (side === 'home' ? '#187fc4' : '#f5d321');
-      $('team-' + side + '-label').textContent = team.name;
+      $('team-' + side + '-label').textContent = team.shortName || team.name;
       const rgb = [1, 3, 5].map(i => parseInt(color.slice(i, i + 2), 16) / 255);
       const linear = rgb.map(v => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
       const luminance = linear[0] * 0.2126 + linear[1] * 0.7152 + linear[2] * 0.0722;
@@ -108,8 +138,8 @@
     // 選手登録情報は公開ブローカーへ送信しない。
     const wire = { ...state, registration: {
       title: state.registration.title,
-      home: { name: state.registration.home.name, color: state.registration.home.color || '#187fc4', players: [] },
-      away: { name: state.registration.away.name, color: state.registration.away.color || '#f5d321', players: [] }
+      home: { name: state.registration.home.name, shortName: state.registration.home.shortName || state.registration.home.name.slice(0, 20), color: state.registration.home.color || '#187fc4', players: [] },
+      away: { name: state.registration.away.name, shortName: state.registration.away.shortName || state.registration.away.name.slice(0, 20), color: state.registration.away.color || '#f5d321', players: [] }
     } };
     client.publish(topic, JSON.stringify(wire), { qos: 1, retain: true }, error => {
       if (error) warn('送信を確認できません。接続を確認してください');
@@ -122,12 +152,16 @@
     save(next); state = next; render(); publish();
   }
   try {
-    if (control) window.RosterEditor.init(key);
+    if (control) {
+      if (!window.RosterEditor?.init) throw Error('roster_design.jsが読み込まれていません。ファイル内容と読み込み先を確認してください');
+      window.RosterEditor.init(key);
+    }
     const saved = localStorage.getItem(key);
     if (saved) { state = JSON.parse(saved); validate(state); registrationForm(); render(); }
     else { state = fresh(); save(state); registrationForm(); render(); }
-  } catch {
-    warn('ブラウザー保存を利用できないか、保存データが不正です。別のルームIDで開いてください'); return;
+  } catch (error) {
+    console.error('起動エラー', error);
+    warn('起動に失敗しました：' + error.message + '。保存データは削除せず、更新した4ファイルがそろっているか確認してください'); return;
   }
   if (control) {
     $('room').textContent = room;
@@ -282,7 +316,7 @@
         const kind = $('popup-type').value;
         if (!popupLabel(kind)) throw Error('表示内容が不正です');
         Object.assign(event, { kind, expiresAt: now + duration, team: state.registration[$('popup-team').value].name });
-        const playerData = p => ({ number: p.number, name: p.name });
+        const playerData = p => ({ number: p.number, name: p.name, position: p.position || '' });
         if (kind === 'substitution') {
           const out = selectedPlayer('popup-out'), incoming = selectedPlayer('popup-in');
           if (!out || !incoming) throw Error('OUTまたはINの背番号が確定済み名簿にありません');
@@ -330,7 +364,7 @@
           event.createdAt < latestPopupAt || seenPopups.has(event.id)) return;
 
       const playerOK = p => p && validText(p.name, 80) && p.name.trim() &&
-        Number.isInteger(p.number) && p.number >= 0 && p.number <= 999;
+        Number.isInteger(p.number) && p.number >= 0 && p.number <= 999 && (p.position === undefined || ['', 'FW', 'MF', 'DF', 'GK'].includes(p.position));
       if (event.kind !== 'hide') {
         if (!popupLabel(event.kind) || !validText(event.team, 80)) return;
         if (event.kind === 'substitution') {
@@ -347,11 +381,14 @@
         if (event.kind === 'substitution') {
           $('popup-out-number').textContent = event.outPlayer.number;
           $('popup-out-name').textContent = event.outPlayer.name;
+          $('popup-out-position').textContent = event.outPlayer.position || '';
           $('popup-in-number').textContent = event.inPlayer.number;
           $('popup-in-name').textContent = event.inPlayer.name;
+          $('popup-in-position').textContent = event.inPlayer.position || '';
         } else {
           $('popup-number-label').textContent = event.player.number;
           $('popup-name-label').textContent = event.player.name;
+          $('popup-position-label').textContent = event.player.position || '';
         }
         $('popup').dataset.kind = event.kind;
         // 連続表示でもアニメーションを開始し直す。
