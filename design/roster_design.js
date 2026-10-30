@@ -8,8 +8,8 @@
   const normalize = value => String(value).normalize('NFKC').trim();
   const empty = () => ({
     title: '',
-    home: { name: 'HOME', color: '#187fc4', players: [] },
-    away: { name: 'AWAY', color: '#f5d321', players: [] }
+    home: { name: 'HOME', shortName: 'HOME', color: '#187fc4', players: [] },
+    away: { name: 'AWAY', shortName: 'AWAY', color: '#f5d321', players: [] }
   });
 
   function toDraft(registration) {
@@ -19,13 +19,13 @@
       const team = registration[side];
       if (!team || typeof team.name !== 'string' || !Array.isArray(team.players) || team.players.length > 100)
         throw Error('チーム情報または選手数が不正です');
-      result[side] = { name: team.name, color: team.color || (side === 'home' ? '#187fc4' : '#f5d321'), players: team.players.map(player => {
+      result[side] = { name: team.name, shortName: team.shortName === undefined ? team.name.slice(0, 20) : team.shortName, color: team.color || (side === 'home' ? '#187fc4' : '#f5d321'), players: team.players.map(player => {
         if (!player || !['string', 'number'].includes(typeof player.number) ||
             typeof player.name !== 'string' || typeof player.starter !== 'boolean')
           throw Error('選手情報の形式が不正です');
         return {
           id: typeof player.id === 'string' && player.id ? player.id : crypto.randomUUID(),
-          number: String(player.number), name: player.name, starter: player.starter
+          number: String(player.number), name: player.name, position: player.position === undefined ? '' : player.position, starter: player.starter
         };
       }) };
     }
@@ -37,6 +37,7 @@
     if (value.title.length > 120) errors.general.push('大会名は120文字以内です');
     for (const side of sides) {
       const team = value[side], numbers = new Map(), ids = new Set();
+      if (typeof team.shortName !== 'string' || !team.shortName.trim() || team.shortName.length > 20) errors.general.push('チーム略称は1〜20文字で入力してください');
       if (!/^#[0-9a-f]{6}$/i.test(team.color)) errors.general.push('チームカラーが不正です');
       if (!team.name.trim() || team.name.length > 80) errors.general.push((side === 'home' ? 'HOME' : 'AWAY') + 'のチーム名を入力してください');
       if (team.players.length > 100) errors.general.push('選手は各チーム100名までです');
@@ -45,6 +46,7 @@
         const number = normalize(player.number);
         if (!/^\d{1,3}$/.test(number)) row.push('背番号は0〜999の整数');
         if (!player.name.trim() || player.name.length > 80) row.push('選手名を80文字以内で入力');
+        if (!['', 'FW', 'MF', 'DF', 'GK'].includes(player.position)) row.push('ポジションはFW/MF/DF/GK');
         if (!player.id || player.id.length > 80 || ids.has(player.id)) row.push('選手IDが重複しています');
         ids.add(player.id);
         errors[side][index] = row;
@@ -68,6 +70,7 @@
     result.title = result.title.trim();
     for (const side of sides) {
       result[side].name = result[side].name.trim();
+      result[side].shortName = result[side].shortName.trim();
       result[side].players.forEach(player => {
         player.number = Number(normalize(player.number));
         player.name = player.name.trim();
@@ -104,6 +107,7 @@
     $('title').value = draft.title;
     $('homeName').value = draft.home.name;
     $('awayName').value = draft.away.name;
+    $('homeShortName').value = draft.home.shortName; $('awayShortName').value = draft.away.shortName;
     $('homeColor').value = draft.home.color; $('awayColor').value = draft.away.color;
     for (const side of sides) {
       const body = $(side + '-rows');
@@ -122,6 +126,12 @@
         const error = document.createElement('div');
         error.className = 'row-error error';
         nameCell.append(name, error);
+        const positionCell = row.insertCell();
+        const position = document.createElement('select');
+        position.setAttribute('aria-label', side + ' ' + (index + 1) + '行目 ポジション');
+        position.add(new Option('未設定', ''));
+        for (const value of ['FW', 'MF', 'DF', 'GK']) position.add(new Option(value, value));
+        position.value = player.position; positionCell.append(position);
         const roleCell = row.insertCell();
         const role = document.createElement('select');
         role.setAttribute('aria-label', side + ' ' + (index + 1) + '行目 先発・控え');
@@ -137,10 +147,10 @@
         deleteCell.append(remove);
         const change = () => {
           player.number = number.value; player.name = name.value;
-          player.starter = role.value === 'true';
+          player.starter = role.value === 'true'; player.position = position.value;
           persist(); markErrors();
         };
-        number.oninput = change; name.oninput = change; role.onchange = change;
+        number.oninput = change; name.oninput = change; role.onchange = change; position.onchange = change;
       });
     }
     markErrors(); status();
@@ -174,12 +184,16 @@
     if (!rows.length) throw Error('選手の行を貼り付けてください');
     if (rows.length > 100) throw Error('一度に取り込めるのは100名までです');
     const players = rows.map((cells, index) => {
-      if (cells.length < 2 || cells.length > 3) throw Error((index + 1) + '行目：背番号・氏名・先発／控えの2〜3列をコピーしてください');
-      const role = normalize(cells[2] || '').toLowerCase();
+      if (cells.length < 2 || cells.length > 4) throw Error((index + 1) + '行目：背番号・氏名・ポジション・先発／控えの2〜4列をコピーしてください');
+      const third = normalize(cells[2] || '').toUpperCase();
+      const hasPosition = cells.length === 4 || ['FW', 'MF', 'DF', 'GK'].includes(third);
+      const position = hasPosition ? third : '';
+      if (!['', 'FW', 'MF', 'DF', 'GK'].includes(position)) throw Error((index + 1) + '行目：ポジションはFW/MF/DF/GKです');
+      const role = normalize(hasPosition ? (cells[3] || '') : (cells[2] || '')).toLowerCase();
       const starter = ['先発', 'スタメン', 'true', '1', '○', '〇'].includes(role);
       if (!starter && !['', '控え', 'ベンチ', 'false', '0'].includes(role))
         throw Error((index + 1) + '行目：先発または控えを指定してください');
-      return { id: crypto.randomUUID(), number: normalize(cells[0]), name: cells[1].trim(), starter };
+      return { id: crypto.randomUUID(), number: normalize(cells[0]), name: cells[1].trim(), position, starter };
     });
     const side = $('bulk-team').value, mode = $('bulk-mode').value;
     const candidate = copy(draft);
@@ -208,16 +222,17 @@
         if (saved) draft = toDraft(JSON.parse(saved));
       } catch { broken = true; }
       confirmed = toDraft(empty());
-      for (const id of ['title', 'homeName', 'awayName', 'homeColor', 'awayColor']) $(id).oninput = () => {
+      for (const id of ['title', 'homeName', 'awayName', 'homeShortName', 'awayShortName', 'homeColor', 'awayColor']) $(id).oninput = () => {
         draft.title = $('title').value;
         draft.home.name = $('homeName').value; draft.away.name = $('awayName').value;
+        draft.home.shortName = $('homeShortName').value; draft.away.shortName = $('awayShortName').value;
         draft.home.color = $('homeColor').value; draft.away.color = $('awayColor').value;
         persist(); markErrors();
       };
       document.querySelectorAll('[data-add]').forEach(button => button.onclick = () => {
         const side = button.dataset.add;
         if (draft[side].players.length >= 100) { message('選手は各チーム100名までです'); return; }
-        draft[side].players.push({ id: crypto.randomUUID(), number: '', name: '', starter: false });
+        draft[side].players.push({ id: crypto.randomUUID(), number: '', name: '', position: '', starter: false });
         draw(); persist();
         $(side + '-rows').lastElementChild.querySelector('input').focus();
       });
@@ -238,7 +253,7 @@
           $('bulk-preview').textContent =
             (pendingBulk.side === 'home' ? 'HOME' : 'AWAY') + '：' +
             (pendingBulk.mode === 'replace' ? '置き換え' : '追加') + '\n' +
-            pendingBulk.players.map(p => p.number + '　' + p.name + '　' + (p.starter ? '先発' : '控え')).join('\n');
+            pendingBulk.players.map(p => p.number + '　' + p.name + '　' + (p.position || '未設定') + '　' + (p.starter ? '先発' : '控え')).join('\n');
           $('bulk-preview').hidden = false; $('bulk-apply').disabled = false; message('');
         } catch (error) { message(error.message); }
       };
@@ -287,4 +302,3 @@
     }
   };
 })();
-
