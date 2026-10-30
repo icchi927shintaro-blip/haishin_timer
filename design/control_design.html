@@ -70,23 +70,27 @@ input[aria-invalid="true"]{outline:2px solid #b3261e}
 <p class="note">得点数は変わりません。スコアは上の＋1で操作してください。選手は確定済みの名簿から呼び出します。</p>
 </section>
 
+<details open><summary>確定済み選手一覧</summary><div id="confirmed-player-list"></div></details>
+
 <details id="roster-panel" open>
 <summary>試合前の名簿登録</summary>
 <p id="roster-status" role="status"></p>
 <p id="roster-message" class="error" role="alert"></p>
 <label>大会名<input id="title" maxlength="120"></label>
-<label>HOMEチーム名<input id="homeName" maxlength="80"></label>
+<label>HOME 正式名称（選手紹介用）<input id="homeName" maxlength="80"></label>
+<label>HOME 略称（スコアボード用）<input id="homeShortName" maxlength="20" placeholder="例：東京大"></label>
 <label>HOME 背景色<input id="homeColor" type="color" value="#187fc4"></label>
-<label>AWAYチーム名<input id="awayName" maxlength="80"></label>
+<label>AWAY 正式名称（選手紹介用）<input id="awayName" maxlength="80"></label>
+<label>AWAY 略称（スコアボード用）<input id="awayShortName" maxlength="20" placeholder="例：東京大"></label>
 <label>AWAY 背景色<input id="awayColor" type="color" value="#f5d321"></label>
 <h3>HOME 登録選手</h3>
 <div class="table-wrap"><table aria-label="HOME登録選手">
-<thead><tr><th class="number-cell">背番号</th><th>選手名</th><th class="role-cell">先発／控え</th><th class="delete-cell">操作</th></tr></thead>
+<thead><tr><th class="number-cell">背番号</th><th>選手名</th><th class="role-cell">位置</th><th class="role-cell">先発／控え</th><th class="delete-cell">操作</th></tr></thead>
 <tbody id="home-rows"></tbody></table></div>
 <button type="button" data-add="home">HOME 選手を追加</button>
 <h3>AWAY 登録選手</h3>
 <div class="table-wrap"><table aria-label="AWAY登録選手">
-<thead><tr><th class="number-cell">背番号</th><th>選手名</th><th class="role-cell">先発／控え</th><th class="delete-cell">操作</th></tr></thead>
+<thead><tr><th class="number-cell">背番号</th><th>選手名</th><th class="role-cell">位置</th><th class="role-cell">先発／控え</th><th class="delete-cell">操作</th></tr></thead>
 <tbody id="away-rows"></tbody></table></div>
 <button type="button" data-add="away">AWAY 選手を追加</button>
 <p class="note">Tabキーで次の項目へ移動できます。下書きは自動保存されます。未登録の行を残さないよう、不要な空行は削除してください。</p>
@@ -98,10 +102,10 @@ input[aria-invalid="true"]{outline:2px solid #b3261e}
 
 <details>
 <summary>Excel・スプレッドシートから一括貼り付け</summary>
-<p class="note">「背番号・選手名・先発／控え」の列をコピーして貼り付けます。先発／控えの列は省略でき、省略時は控えです。見出し行も貼り付けられます。</p>
+<p class="note">「背番号・選手名・ポジション・先発／控え」の列をコピーして貼り付けます。ポジションはFW/MF/DF/GKです。旧形式の2〜3列も取り込めます。先発／控えを省略すると控えです。見出し行も貼り付けられます。</p>
 <label>対象チーム<select id="bulk-team"><option value="home">HOME</option><option value="away">AWAY</option></select></label>
 <label>取り込み方法<select id="bulk-mode"><option value="append">既存の下書きへ追加</option><option value="replace">対象チームの下書きを置き換え</option></select></label>
-<label>貼り付け欄<textarea id="bulk-text" placeholder="背番号&#9;選手名&#9;先発／控え"></textarea></label>
+<label>貼り付け欄<textarea id="bulk-text" placeholder="背番号&#9;選手名&#9;ポジション&#9;先発／控え"></textarea></label>
 <button id="bulk-check" type="button">取り込み内容を確認</button>
 <pre id="bulk-preview" hidden></pre>
 <button id="bulk-apply" type="button" disabled>確認した内容を下書きへ取り込む</button>
@@ -128,7 +132,7 @@ input[aria-invalid="true"]{outline:2px solid #b3261e}
 <p class="note">操作画面は1つだけ使用してください。別の試合には別のルームIDを使用します。</p>
 </main>
 <script src="https://unpkg.com/mqtt@5.10.4/dist/mqtt.min.js"></script>
-<script src="./roster_design.js?v=1"></script>
-<script src="./design.js?v=1"></script>
+<script src="./roster_design.js?v=2"></script>
+<script src="./design.js?v=2"></script>
 </body>
 </html>
