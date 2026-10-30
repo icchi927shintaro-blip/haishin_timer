@@ -43,6 +43,7 @@ body{position:relative;font-family:"Yu Gothic","Meiryo",sans-serif}
  #timer-wrapper{height:30px;width:100px}
  #timer{font-size:23px}
 }
+.position-label{font:700 15px Arial,sans-serif;flex-shrink:0}.position-label:empty{display:none}
 </style>
 </head>
 <body>
@@ -60,14 +61,14 @@ body{position:relative;font-family:"Yu Gothic","Meiryo",sans-serif}
 <div id="popup" role="status" aria-live="polite" aria-hidden="true">
  <div id="popup-type-label"></div>
  <div id="popup-team-label"></div>
- <div id="popup-player"><span id="popup-number-label"></span><span id="popup-name-label"></span></div>
+ <div id="popup-player"><span id="popup-position-label" class="position-label"></span><span id="popup-number-label"></span><span id="popup-name-label"></span></div>
  <div id="popup-substitution">
-  <div class="sub-player"><span class="sub-tag out">OUT</span><span id="popup-out-number" class="sub-number"></span><span id="popup-out-name" class="sub-name"></span></div>
-  <div class="sub-player"><span class="sub-tag in">IN</span><span id="popup-in-number" class="sub-number"></span><span id="popup-in-name" class="sub-name"></span></div>
+  <div class="sub-player"><span class="sub-tag out">OUT</span><span id="popup-out-position" class="position-label"></span><span id="popup-out-number" class="sub-number"></span><span id="popup-out-name" class="sub-name"></span></div>
+  <div class="sub-player"><span class="sub-tag in">IN</span><span id="popup-in-position" class="position-label"></span><span id="popup-in-number" class="sub-number"></span><span id="popup-in-name" class="sub-name"></span></div>
  </div>
 </div>
 <script src="https://unpkg.com/mqtt@5.10.4/dist/mqtt.min.js"></script>
-<script src="./design.js?v=1"></script>
+<script src="./design.js?v=2"></script>
 </body>
 </html>
 
