@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<title>OBS表示 / Pages</title>
+
+<style>
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 1920px;
+  height: 1080px;
+  background: transparent;
+  overflow: hidden;
+}
+.dynamic {
+  position: absolute;
+  font-family: Impact, sans-serif;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: white;
+}
+#timer-wrapper {
+  position: absolute;
+  top: 25px;
+  left: 20px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  background: #052544;
+  transition: background-color .3s;
+}
+#timer {
+  position: static;
+  font-size: 60px;
+  letter-spacing: .05em;
+}
+.stoppage {
+  background: #7998ab !important;
+}
+#score-home {
+  top: 20px;
+  left: 350px;
+  font-size: 80px;
+}
+#score-away {
+  top: 20px;
+  left: 450px;
+  font-size: 80px;
+}
+#warning {
+  position: absolute;
+  top: 130px;
+  left: 20px;
+  background: #821d1d;
+  color: white;
+  padding: 10px;
+  font: 20px sans-serif;
+}
+</style>
+
+<div id="timer-wrapper">
+  <div id="timer" class="dynamic">--:--</div>
+</div>
+
+<div id="score-home" class="dynamic">-</div>
+<div id="score-away" class="dynamic">-</div>
+
+<div id="warning" hidden></div>
+
+<script src="https://unpkg.com/mqtt@5.10.4/dist/mqtt.min.js"></script>
+<script src="./pages.js"></script>
+</html>
