@@ -2,70 +2,40 @@
 <html lang="ja">
 <meta charset="utf-8">
 <title>OBS表示 / Pages</title>
-
 <style>
-html, body {
-  margin: 0;
-  padding: 0;
-  width: 1920px;
-  height: 1080px;
-  background: transparent;
-  overflow: hidden;
-}
-.dynamic {
-  position: absolute;
-  font-family: Impact, sans-serif;
-  font-variant-numeric: tabular-nums;
-  line-height: 1;
-  color: white;
-}
-#timer-wrapper {
-  position: absolute;
-  top: 25px;
-  left: 20px;
-  padding: 5px 10px;
-  border-radius: 8px;
-  background: #052544;
-  transition: background-color .3s;
-}
-#timer {
-  position: static;
-  font-size: 60px;
-  letter-spacing: .05em;
-}
-.stoppage {
-  background: #7998ab !important;
-}
-#score-home {
-  top: 20px;
-  left: 350px;
-  font-size: 80px;
-}
-#score-away {
-  top: 20px;
-  left: 450px;
-  font-size: 80px;
-}
-#warning {
-  position: absolute;
-  top: 130px;
-  left: 20px;
-  background: #821d1d;
-  color: white;
-  padding: 10px;
-  font: 20px sans-serif;
-}
+html,body{margin:0;padding:0;width:1920px;height:1080px;background:transparent;overflow:hidden}
+body{position:relative}
+.dynamic{position:absolute;font-family:Impact,sans-serif;font-variant-numeric:tabular-nums;line-height:1;color:white}
+#timer-wrapper{position:absolute;top:25px;left:20px;padding:5px 10px;border-radius:8px;background:#052544;transition:background-color .3s}
+#timer{position:static;font-size:60px;letter-spacing:.05em}
+.stoppage{background:#7998ab!important}
+#score-home{top:20px;left:350px;font-size:80px}
+#score-away{top:20px;left:450px;font-size:80px}
+#warning{position:absolute;top:130px;left:20px;background:#821d1d;color:white;padding:10px;font:20px sans-serif}
+#popup{position:absolute;right:60px;bottom:60px;width:440px;height:104px;box-sizing:border-box;
+background:#187fc4;color:#fff;border:0;box-shadow:none;overflow:hidden;
+opacity:0;visibility:hidden;transform:translateX(24px);
+transition:opacity .3s,transform .3s,visibility .3s;
+font-family:"Yu Gothic","Meiryo",sans-serif;padding:10px 16px}
+#popup.visible{opacity:1;visibility:visible;transform:translateX(0)}
+#popup-type-label{display:none}
+#popup-team-label{font-size:16px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:0 0 6px}
+#popup-player{display:flex;align-items:center;gap:12px;height:48px}
+#popup-number-label{font:42px Impact,sans-serif;min-width:50px}
+#popup-name-label{font-size:26px;line-height:1.2;font-weight:bold;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 </style>
-
-<div id="timer-wrapper">
-  <div id="timer" class="dynamic">--:--</div>
-</div>
-
+<div id="timer-wrapper"><div id="timer" class="dynamic">--:--</div></div>
 <div id="score-home" class="dynamic">-</div>
 <div id="score-away" class="dynamic">-</div>
-
 <div id="warning" hidden></div>
-
+<div id="popup" role="status" aria-live="polite" aria-hidden="true">
+<div id="popup-type-label"></div>
+<div id="popup-team-label"></div>
+<div id="popup-player"><span id="popup-number-label"></span><span id="popup-name-label"></span></div>
+</div>
 <script src="https://unpkg.com/mqtt@5.10.4/dist/mqtt.min.js"></script>
-<script src="./pages.js"></script>
+<script src="./pages.js?v=2"></script>
 </html>
+
+
+
