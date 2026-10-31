@@ -109,21 +109,25 @@
       $('phase').textContent = (state.clock.period === 1 ? '前半' : '後半') + '・' + (state.clock.running ? '進行中' : '停止中');
     } else {
       $('score-home').textContent = state.scoreHome; $('score-away').textContent = state.scoreAway;
+      $('score-home').dataset.digits = String(state.scoreHome).length;
+      $('score-away').dataset.digits = String(state.scoreAway).length;
       paintTeams();
       $('timer-wrapper').classList.toggle('stoppage', ms >= (state.clock.period === 1 ? 2700000 : 5400000));
     }
   }
 
+  function contrastText(color) {
+    const rgb = [1,3,5].map(i=>parseInt(color.slice(i,i+2),16)/255);
+    const linear = rgb.map(v=>v<=0.04045?v/12.92:((v+0.055)/1.055)**2.4);
+    return linear[0]*0.2126+linear[1]*0.7152+linear[2]*0.0722>0.179?'#111111':'#ffffff';
+  }
   function paintTeams() {
     for (const side of ['home', 'away']) {
       const team = state.registration[side];
       const color = team.color || (side === 'home' ? '#187fc4' : '#f5d321');
       $('team-' + side + '-label').textContent = team.shortName || team.name;
-      const rgb = [1, 3, 5].map(i => parseInt(color.slice(i, i + 2), 16) / 255);
-      const linear = rgb.map(v => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
-      const luminance = linear[0] * 0.2126 + linear[1] * 0.7152 + linear[2] * 0.0722;
       document.body.style.setProperty('--' + side + '-color', color);
-      document.body.style.setProperty('--' + side + '-text', luminance > 0.179 ? '#111111' : '#ffffff');
+      document.body.style.setProperty('--' + side + '-text', contrastText(color));
     }
   }
 
@@ -151,6 +155,17 @@
     next.source = source;
     save(next); state = next; render(); publish();
   }
+  window.AppLifecycle = {
+    started:false, error:null,
+    beforeReload() {
+      if (control) window.RosterEditor?.flush();
+      if (state) {
+        const stored = localStorage.getItem(key);
+        const newer = stored ? JSON.parse(stored) : null;
+        if (!newer || !Number.isSafeInteger(newer.updatedAt) || newer.updatedAt <= state.updatedAt) save(state);
+      }
+    }
+  };
   try {
     if (control) {
       if (!window.RosterEditor?.init) throw Error('roster_design.jsが読み込まれていません。ファイル内容と読み込み先を確認してください');
@@ -160,8 +175,9 @@
     if (saved) { state = JSON.parse(saved); validate(state); registrationForm(); render(); }
     else { state = fresh(); save(state); registrationForm(); render(); }
   } catch (error) {
+    window.AppLifecycle.error = error.message;
     console.error('起動エラー', error);
-    warn('起動に失敗しました：' + error.message + '。保存データは削除せず、更新した4ファイルがそろっているか確認してください'); return;
+    warn('起動に失敗しました：' + error.message + '。保存データは削除せず、更新した配布ファイルがそろっているか確認してください'); return;
   }
   if (control) {
     $('room').textContent = room;
@@ -315,7 +331,7 @@
         if (![4000, 6000, 8000, 10000].includes(duration)) throw Error('表示時間が不正です');
         const kind = $('popup-type').value;
         if (!popupLabel(kind)) throw Error('表示内容が不正です');
-        Object.assign(event, { kind, expiresAt: now + duration, team: state.registration[$('popup-team').value].name });
+        Object.assign(event, { kind, expiresAt: now + duration, team: state.registration[$('popup-team').value].name, color: state.registration[$('popup-team').value].color || ($('popup-team').value === 'home' ? '#187fc4' : '#f5d321') });
         const playerData = p => ({ number: p.number, name: p.name, position: p.position || '' });
         if (kind === 'substitution') {
           const out = selectedPlayer('popup-out'), incoming = selectedPlayer('popup-in');
@@ -366,7 +382,7 @@
       const playerOK = p => p && validText(p.name, 80) && p.name.trim() &&
         Number.isInteger(p.number) && p.number >= 0 && p.number <= 999 && (p.position === undefined || ['', 'FW', 'MF', 'DF', 'GK'].includes(p.position));
       if (event.kind !== 'hide') {
-        if (!popupLabel(event.kind) || !validText(event.team, 80)) return;
+        if (!popupLabel(event.kind) || !validText(event.team, 80) || (event.color !== undefined && !/^#[0-9a-f]{6}$/i.test(event.color))) return;
         if (event.kind === 'substitution') {
           if (!playerOK(event.outPlayer) || !playerOK(event.inPlayer) || event.outPlayer.number === event.inPlayer.number) return;
         } else if (!playerOK(event.player)) return;
@@ -376,6 +392,10 @@
       if (seenPopups.size > 100) seenPopups.delete(seenPopups.values().next().value);
       hidePopup();
       if (event.kind !== 'hide') {
+        const matchedTeam = ['home','away'].map(side=>state?.registration[side]).find(team=>team?.name === event.team);
+        const popupColor = event.color || matchedTeam?.color || '#187fc4';
+        $('popup').style.setProperty('--popup-color',popupColor);
+        $('popup').style.setProperty('--popup-text',contrastText(popupColor));
         $('popup-type-label').textContent = popupLabel(event.kind);
         $('popup-team-label').textContent = event.team;
         if (event.kind === 'substitution') {
@@ -408,9 +428,5 @@
     $('popup-hide').onclick = () => sendPopup(true);
     popupPreview();
   }
+  window.AppLifecycle.started = true;
 })();
-
-
-
-
-
