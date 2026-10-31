@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "hashFormat": "utf8-lf-trim-end",
+  "release": "20261031.4",
+  "files": {
+    "control_design.html": "7f66aff31fc8eff64813295209ce4f7ce0f0b9af4b84945ae2d6f81d31fc565f",
+    "display_design.html": "0cd6e80ffd34fdeeb80aff7977c6c2d12f0044e6464581be9922174be8260a63",
+    "design.js": "bad4c8f8c745256f41f4ae55267685e354ead7011e48bb1b93253e1b8b0995fa",
+    "roster_design.js": "2988951c6e81fef3a5da7a46a80e45ecfa81eac88d1fc1b9356612222521b43e"
+  }
+}
