@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ja">
+<html lang="ja" data-page="control" data-release="20261031.4">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -32,7 +32,14 @@ input[aria-invalid="true"]{outline:2px solid #b3261e}
 </style>
 </head>
 <body>
-<main>
+<aside id="app-loader" role="status" style="box-sizing:border-box;position:relative;z-index:10000;max-width:808px;margin:12px auto;padding:12px;background:#eef6fc;color:#17364d;font:14px sans-serif;border:1px solid #b5cddd">
+<span id="app-load-message">最新版を確認しています…</span>
+<button id="app-load-retry" type="button" hidden>再確認して読み直す</button>
+<button id="app-load-check" type="button" hidden>更新を確認</button>
+<button id="app-load-update" type="button" hidden>保存して最新版へ更新</button>
+<button id="app-load-backup" type="button" hidden>保存データを取り出す</button>
+</aside>
+<main inert>
 <h1>試合操作 / 新デザイン</h1>
 <p id="status" role="status">接続準備中</p>
 <p id="message" role="alert"></p>
@@ -131,8 +138,185 @@ input[aria-invalid="true"]{outline:2px solid #b3261e}
 <p>ルームID：<span id="room"></span></p>
 <p class="note">操作画面は1つだけ使用してください。別の試合には別のルームIDを使用します。</p>
 </main>
-<script src="https://unpkg.com/mqtt@5.10.4/dist/mqtt.min.js"></script>
-<script src="./roster_design.js?v=2"></script>
-<script src="./design.js?v=2"></script>
+
+
+
+
+
+
+<!--release-loader:start-->
+<script>
+(async () => {
+  'use strict';
+  const doc = document.documentElement;
+  const control = doc.dataset.page === 'control';
+  const currentRelease = doc.dataset.release;
+  const banner = document.getElementById('app-loader');
+  const label = document.getElementById('app-load-message');
+  const retry = document.getElementById('app-load-retry');
+  const update = document.getElementById('app-load-update');
+  const checkButton = document.getElementById('app-load-check');
+  const recoveryButton = document.getElementById('app-load-backup');
+  const main = document.querySelector('main');
+  let started = false, checking = false, latest;
+  if (main) main.inert = true;
+  function tell(text, failed = false) {
+    banner.hidden = !control && !failed;
+    label.textContent = text;
+  }
+  function roomKey() {
+    const room = new URLSearchParams(location.hash.slice(1)).get('room');
+    return room && /^[a-zA-Z0-9_-]{8,80}$/.test(room)
+      ? 'haishin-design-v1:' + room + (control ? ':control' : ':display') : null;
+  }
+  async function getManifest() {
+    const url = new URL('./release.json', location.href);
+    url.searchParams.set('check', Date.now() + '-' + Math.random().toString(36).slice(2));
+    const res = await fetch(url, {cache:'no-store'});
+    if (!res.ok) throw Error('release.jsonを取得できません（HTTP ' + res.status + '）');
+    const manifest = await res.json();
+    if (manifest.schemaVersion !== 1 || manifest.hashFormat !== 'utf8-lf-trim-end' || !/^[a-zA-Z0-9._-]{1,64}$/.test(manifest.release) ||
+        !manifest.files || !manifest.files['design.js'] || !manifest.files['roster_design.js'])
+      throw Error('release.jsonの形式が不正です');
+    return manifest;
+  }
+  function navigate(release) {
+    window.AppLifecycle?.beforeReload();
+    const url = new URL(location.href);
+    if (release) url.searchParams.set('appRelease', release);
+    url.searchParams.set('reload', String(Date.now()));
+    // URLの#room=...は変更しない。
+    location.replace(url.href);
+  }
+  retry.onclick = () => {
+    try { navigate(latest?.release); }
+    catch(error) { tell('更新前の保存に失敗しました：' + error.message, true); }
+  };
+  update.onclick = retry.onclick;
+  function backup(manifest) {
+    const key = roomKey();
+    if (!key || !control) return;
+    const backupKey = key + ':upgrade-backup';
+    const oldBackup = localStorage.getItem(backupKey);
+    let oldRelease;
+    try { oldRelease = oldBackup ? JSON.parse(oldBackup).release : null; } catch {}
+    if (oldRelease === manifest.release) return;
+    const state = localStorage.getItem(key);
+    const draft = localStorage.getItem(key + ':roster-draft');
+    if (state !== null || draft !== null) {
+      localStorage.setItem(backupKey, JSON.stringify({
+        format:'haishin-upgrade-backup', version:1, release:manifest.release,
+        savedAt:new Date().toISOString(), state, draft
+      }));
+    }
+  }
+  recoveryButton.onclick = () => {
+    try {
+      const key = roomKey();
+      if (!key) throw Error('ルームIDがありません');
+      const data = {
+        format:'haishin-recovery', version:1,
+        state:localStorage.getItem(key), draft:localStorage.getItem(key + ':roster-draft'),
+        beforeUpdate:localStorage.getItem(key + ':upgrade-backup')
+      };
+      const url = URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
+      const a = document.createElement('a');
+      a.href = url; a.download = 'haishin-recovery.json'; a.click();
+      setTimeout(()=>URL.revokeObjectURL(url),1000);
+    } catch(error) { tell('バックアップを取り出せません：' + error.message,true); }
+  };
+  async function verifiedSource(file, manifest) {
+    const expected = manifest.files[file];
+    if (!/^[0-9a-f]{64}$/.test(expected || '')) throw Error(file + 'の検証情報がありません');
+    const url = new URL('./' + file,location.href);
+    url.searchParams.set('release',manifest.release);
+    const res = await fetch(url,{cache:'no-store'});
+    if (!res.ok) throw Error(file + 'を取得できません（HTTP ' + res.status + '）');
+    const bytes = await res.arrayBuffer();
+    const source = new TextDecoder().decode(bytes).replace(/^\uFEFF/,'').replace(/\r\n?/g,'\n').trimEnd();
+    const digest = await crypto.subtle.digest('SHA-256',new TextEncoder().encode(source));
+    const actual = Array.from(new Uint8Array(digest),n=>n.toString(16).padStart(2,'0')).join('');
+    if (actual !== expected) throw Error(file + 'の版が一致しません。公開反映の完了後に再確認してください');
+    return source;
+  }
+  function script(url) {
+    return new Promise((resolve,reject)=>{
+      const tag = document.createElement('script');
+      tag.src = url; tag.onload = resolve;
+      tag.onerror = ()=>reject(Error('スクリプトを読み込めません：' + url));
+      document.body.append(tag);
+    });
+  }
+  async function execute(source) {
+    const url = URL.createObjectURL(new Blob([source],{type:'text/javascript'}));
+    try { await script(url); } finally { URL.revokeObjectURL(url); }
+  }
+  async function checkUpdates() {
+    if (!started || checking) return;
+    checking = true;
+    try {
+      latest = await getManifest();
+      if (latest.release !== currentRelease) {
+        if (control) {
+          update.hidden = false;
+          tell('新しい版 ' + latest.release + ' が公開されました。下書きと試合状態を保存して更新できます。');
+        }
+      } else if (control) {
+        update.hidden = true;
+        tell('使用中：' + currentRelease + '（最新版）');
+      }
+    } catch {
+      if (control) tell('更新を確認できません。現在の版 ' + currentRelease + ' で操作を続けられます。');
+    } finally { checking = false; }
+  }
+  checkButton.onclick = checkUpdates;
+  try {
+    tell('最新版を確認しています…');
+    latest = await getManifest();
+    const marker = 'haishin-html-reload:' + location.pathname + ':' + latest.release;
+    if (latest.release !== currentRelease) {
+      if (sessionStorage.getItem(marker))
+        throw Error('HTMLの公開反映がまだ揃っていません。少し待って再確認してください');
+      sessionStorage.setItem(marker,'1');
+      navigate(latest.release);
+      return;
+    }
+    sessionStorage.removeItem(marker);
+    const required = control
+      ? ['homeShortName','homeColor','bulk-check','popup-out','confirmed-player-list']
+      : ['scoreboard','team-home-label','popup-position-label','popup-in-position'];
+    if (required.some(id=>!document.getElementById(id)))
+      throw Error('HTMLの内容がこの版と一致しません。正しいファイルをアップロードしてください');
+    const files = control ? ['roster_design.js','design.js'] : ['design.js'];
+    // 全ファイルの検証が済むまでアプリを初期化しない。
+    const sources = await Promise.all(files.map(file=>verifiedSource(file,latest)));
+    backup(latest);
+    if (!window.mqtt) await script('https://unpkg.com/mqtt@5.10.4/dist/mqtt.min.js');
+    if (!window.mqtt) throw Error('通信ライブラリを読み込めません');
+    for (const source of sources) await execute(source);
+    if (!window.AppLifecycle?.started)
+      throw Error(window.AppLifecycle?.error || 'アプリの初期化を完了できませんでした');
+    started = true;
+    if (main) main.inert = false;
+    retry.hidden = true;
+    checkButton.hidden = !control;
+    recoveryButton.hidden = !control;
+    tell('使用中：' + currentRelease + '（最新版）');
+    // 開いている最中は通知のみ。配信・入力を中断する自動再読込はしない。
+    if (control) {
+      setInterval(checkUpdates,60000);
+      document.addEventListener('visibilitychange',()=>{
+        if (!document.hidden) checkUpdates();
+      });
+    }
+  } catch(error) {
+    console.error('読み込みエラー',error);
+    retry.hidden = false;
+    recoveryButton.hidden = !control;
+    tell('読み込みを完了できません：' + error.message + '。保存済みデータは消していません。',true);
+  }
+})();
+</script>
+<!--release-loader:end-->
 </body>
 </html>
