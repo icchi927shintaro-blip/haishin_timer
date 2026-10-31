@@ -3,7 +3,7 @@
   const $ = id => document.getElementById(id);
   const copy = value => structuredClone(value);
   const sides = ['home', 'away'];
-  let draft, confirmed, storageKey, pendingBulk;
+  let draft, confirmed, storageKey, pendingBulk, lastSavedDraft;
   const message = text => { $('roster-message').textContent = text; };
   const normalize = value => String(value).normalize('NFKC').trim();
   const empty = () => ({
@@ -88,7 +88,10 @@
   }
 
   function persist() {
-    try { localStorage.setItem(storageKey, JSON.stringify(draft)); status(); }
+    try {
+      const serialized = JSON.stringify(draft);
+      localStorage.setItem(storageKey, serialized); lastSavedDraft = serialized; status();
+    }
     catch { status(false); message('下書きを保存できません。ブラウザーの保存容量・設定を確認してください'); }
   }
 
@@ -219,7 +222,7 @@
       let broken = false;
       try {
         const saved = localStorage.getItem(storageKey);
-        if (saved) draft = toDraft(JSON.parse(saved));
+        if (saved) { draft = toDraft(JSON.parse(saved)); lastSavedDraft = JSON.stringify(draft); }
       } catch { broken = true; }
       confirmed = toDraft(empty());
       for (const id of ['title', 'homeName', 'awayName', 'homeShortName', 'awayShortName', 'homeColor', 'awayColor']) $(id).oninput = () => {
@@ -291,9 +294,19 @@
       if (broken) message('保存済みの下書きを読み込めません。確定済み名簿を表示します');
     },
     receive(registration, force = false) {
+      const dirty = draft && JSON.stringify(draft) !== JSON.stringify(confirmed);
       confirmed = toDraft(registration);
-      if (!draft || force) { draft = copy(confirmed); draw(); persist(); }
+      if (!draft || force || !dirty) { draft = copy(confirmed); draw(); persist(); }
       else status();
+    },
+    flush() {
+      if (draft) {
+        const serialized = JSON.stringify(draft);
+        if (serialized !== lastSavedDraft) {
+          localStorage.setItem(storageKey, serialized);
+          lastSavedDraft = serialized;
+        }
+      }
     },
     value() {
       markErrors();
